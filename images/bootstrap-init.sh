@@ -2,27 +2,17 @@
 set -e
 
 echo "======================================"
-echo "Nomad ACL Bootstrap Init Container"
+echo "Nomad ACL Bootstrap (postStart hook)"
 echo "======================================"
 
-# Start Nomad in the background temporarily
-echo "Starting temporary Nomad server for bootstrap..."
-nomad agent -config=/nomad/config/server.hcl &
-NOMAD_PID=$!
+# Check if ACL is already bootstrapped by looking for token file
+if [ -f "/nomad/data/.bootstrap-token" ]; then
+  echo "ACL already bootstrapped (token file exists)"
+  echo "Bootstrap hook complete - nothing to do"
+  exit 0
+fi
 
-# Ensure cleanup on exit
-cleanup() {
-  echo ""
-  echo "======================================"
-  echo "Shutting down temporary Nomad server..."
-  kill -TERM $NOMAD_PID 2>/dev/null || true
-  wait $NOMAD_PID 2>/dev/null || true
-  echo "Cleanup complete"
-  echo "======================================"
-}
-trap cleanup EXIT INT TERM
-
-# Wait for local Nomad to start
+# Wait for local Nomad to start (it's starting in parallel with this hook)
 echo "Waiting for Nomad API to be ready..."
 ELAPSED=0
 until curl -sf http://localhost:4646/v1/agent/health?type=server >/dev/null 2>&1; do
@@ -35,7 +25,7 @@ until curl -sf http://localhost:4646/v1/agent/health?type=server >/dev/null 2>&1
 done
 echo "Nomad API is ready!"
 
-# Wait for leader election
+# Wait for leader election across the cluster
 echo "Waiting for leader election..."
 ELAPSED=0
 TIMEOUT=${BOOTSTRAP_TIMEOUT:-300}
