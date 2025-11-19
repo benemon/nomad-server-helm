@@ -2,16 +2,23 @@ FROM registry.access.redhat.com/ubi9-minimal:latest
 
 USER root
 
-RUN microdnf -y install yum-utils && \
+RUN microdnf -y install yum-utils curl && \
     yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
     microdnf -y install tar nomad-enterprise && \
     mkdir -p /nomad/data && \
-    mkdir -p /nomad/config
+    mkdir -p /nomad/config && \
+    mkdir -p /nomad/acl-policy
+
+# Copy bootstrap init script
+COPY bootstrap-init.sh /usr/local/bin/bootstrap-init.sh
 
 RUN chgrp -R 0 /usr/bin/nomad && \
     chmod -R g=u /usr/bin/nomad && \
     chgrp -R 0 /nomad && \
     chmod -R g=u /nomad && \
+    chmod +x /usr/local/bin/bootstrap-init.sh && \
+    chgrp 0 /usr/local/bin/bootstrap-init.sh && \
+    chmod g=u /usr/local/bin/bootstrap-init.sh && \
     usermod -a -G 0 nomad
 
 USER nomad
