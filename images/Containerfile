@@ -2,7 +2,7 @@ FROM registry.access.redhat.com/ubi9-minimal:latest
 
 USER root
 
-RUN microdnf -y install yum-utils curl && \
+RUN microdnf -y install yum-utils && \
     yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
     microdnf -y install tar nomad-enterprise && \
     mkdir -p /nomad/data && \
