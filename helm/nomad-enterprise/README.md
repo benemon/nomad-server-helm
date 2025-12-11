@@ -255,6 +255,28 @@ Additional rules can be added via `openshift.monitoring.prometheusRule.rules`.
 
 A community Grafana dashboard for Nomad is available at https://grafana.com/grafana/dashboards/12787
 
+## Custom Configuration
+
+Nomad merges all `.hcl` files from the config directory alphabetically. Use `server.extraConfig` to add custom configuration:
+
+```yaml
+server:
+  extraConfig: |
+    vault {
+      enabled = true
+      address = "https://vault.example.com:8200"
+    }
+```
+
+Or load from a file:
+
+```bash
+helm install nomad-enterprise ./helm/nomad-enterprise \
+  --set-file server.extraConfig=./custom-config.hcl
+```
+
+The custom config is rendered as `90-custom.hcl`, which is merged after `server.hcl`.
+
 ## Scaling
 
 To scale the Nomad server cluster:

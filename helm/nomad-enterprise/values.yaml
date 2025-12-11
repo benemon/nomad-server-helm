@@ -159,6 +159,11 @@ server:
       # Reference to existing secret with access-key-id and secret-access-key keys
       existingSecret: ""
 
+  # Additional Nomad configuration (raw HCL)
+  # Merged with server.hcl as /nomad/config/90-custom.hcl
+  # Use --set-file server.extraConfig=./custom.hcl to load from file
+  extraConfig: ""
+
 # Pod anti-affinity for high availability
 # Ensures Nomad server pods are spread across different nodes
 affinity:

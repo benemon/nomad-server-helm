@@ -154,3 +154,7 @@ data:
 
     # Log level
     log_level = "INFO"
+{{- if .Values.server.extraConfig }}
+  90-custom.hcl: |
+{{ .Values.server.extraConfig | indent 4 }}
+{{- end }}
