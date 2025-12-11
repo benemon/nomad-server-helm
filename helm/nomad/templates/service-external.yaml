@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.external.name }}
+  namespace: {{ include "nomad.namespace" . }}
+  {{- with .Values.service.external.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "nomad.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.external.type }}
+  {{- if .Values.service.external.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.service.external.loadBalancerIP }}
+  {{- end }}
+  ports:
+    - name: http
+      port: 4646
+      targetPort: 4646
+      protocol: TCP
+    - name: rpc
+      port: 4647
+      targetPort: 4647
+      protocol: TCP
+  selector:
+    {{- include "nomad.selectorLabels" . | nindent 4 }}

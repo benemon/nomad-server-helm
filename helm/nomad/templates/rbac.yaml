@@ -1,0 +1,35 @@
+{{- if .Values.serviceAccount.create -}}
+---
+# Role for reading services (needed for lookup function in ConfigMap)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "nomad.fullname" . }}-service-reader
+  namespace: {{ include "nomad.namespace" . }}
+  annotations:
+  labels:
+    {{- include "nomad.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list"]
+
+---
+# RoleBinding to grant the ServiceAccount permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "nomad.fullname" . }}-service-reader
+  namespace: {{ include "nomad.namespace" . }}
+  annotations:
+  labels:
+    {{- include "nomad.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "nomad.fullname" . }}-service-reader
+subjects:
+- kind: ServiceAccount
+  name: {{ include "nomad.serviceAccountName" . }}
+  namespace: {{ include "nomad.namespace" . }}
+{{- end }}

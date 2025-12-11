@@ -1,0 +1,141 @@
+# Default values for nomad-enterprise-server
+
+# Number of Nomad server replicas
+replicaCount: 1
+
+# Nomad image configuration
+image:
+  # repository: quay.io/benjamin_holmes/nomad-enterprise-server
+  repository: docker.io/hashicorp/nomad
+  pullPolicy: Always
+  #tag: "main"
+  tag: 1.11-ent
+
+imagePullSecrets: []
+
+# Namespace creation
+namespaceCreate: true
+namespace: nomad
+
+# Nomad Enterprise license
+# Provide via: --set license=<your-license-string>
+# Or: --set-file license=/path/to/license.hclic
+license: ""
+
+# Gossip encryption configuration
+gossip:
+  # Leave empty to auto-generate
+  # Or provide your own base64-encoded 32-byte key
+  key: ""
+
+# Service configuration
+service:
+  # Headless service for StatefulSet (always created)
+  headless:
+    name: nomad
+
+  # Internal ClusterIP service for API/UI (backend for Route)
+  internal:
+    name: nomad-internal
+    type: ClusterIP
+    port: 4646
+
+  # External LoadBalancer service for HTTP/API + RPC
+  external:
+    name: nomad-external
+    type: LoadBalancer
+    loadBalancerIP: ""  # Set this to a fixed IP from your MetalLB pool (e.g., 172.16.101.20)
+    annotations: {}
+
+# OpenShift-specific configuration
+openshift:
+  enabled: true
+  route:
+    enabled: true
+    host: ""  # Leave empty for auto-generated, or specify custom hostname
+    tls:
+      termination: edge  # edge, passthrough, or reencrypt
+      insecureEdgeTerminationPolicy: Redirect
+
+# Advertise configuration
+# REQUIRED: Set this to the same IP/hostname as service.external.loadBalancerIP
+advertise:
+  address: ""  # Must match service.external.loadBalancerIP (e.g., 172.16.101.20)
+
+# ServiceAccount configuration
+serviceAccount:
+  create: true
+  name: ""  # Auto-generated if empty
+  annotations: {}
+
+# Storage configuration
+persistence:
+  enabled: true
+  storageClass: ""  # Empty means use cluster default
+  size: 10Gi
+  accessMode: ReadWriteOnce
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+# Security context for OpenShift SCC compatibility
+securityContext:
+  runAsNonRoot: true
+  # OpenShift assigns arbitrary UID
+  # fsGroup is managed by OpenShift
+
+# Nomad server configuration
+server:
+  # TLS configuration (disabled for PoC)
+  tls:
+    enabled: false
+    # When enabled, provide cert paths
+    # caCert: ""
+    # serverCert: ""
+    # serverKey: ""
+
+  # ACL configuration
+  acl:
+    enabled: false  # Disabled by default - enable manually and bootstrap via CLI
+
+  # Autopilot configuration
+  autopilot:
+    cleanupDeadServers: true
+    lastContactThreshold: "200ms"
+    maxTrailingLogs: 250
+    serverStabilizationTime: "10s"
+    enableRedundancyZones: false  # Simplified for StatefulSet
+    disableUpgradeMigration: false
+    enableCustomUpgrades: false
+
+# Pod anti-affinity for high availability
+# Ensures Nomad server pods are spread across different nodes
+affinity:
+  podAntiAffinity:
+    enabled: true
+    # Use "preferred" (soft) or "required" (hard) anti-affinity
+    # "preferred" allows scheduling on same node if necessary
+    # "required" will fail if not enough nodes are available
+    type: preferred
+    # Weight for preferred anti-affinity (1-100)
+    weight: 100
+    # Topology key for spreading pods
+    topologyKey: kubernetes.io/hostname
+
+# Node selector for scheduling
+nodeSelector: {}
+
+# Tolerations for scheduling
+tolerations: []
+
+# Additional labels
+labels: {}
+
+# Additional annotations
+annotations: {}

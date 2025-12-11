@@ -1,0 +1,120 @@
+{{- $advertiseAddr := .Values.advertise.address -}}
+{{- if not $advertiseAddr -}}
+  {{- $lbSvc := lookup "v1" "Service" .Release.Namespace "nomad-external" -}}
+  {{- if $lbSvc -}}
+    {{- if $lbSvc.status.loadBalancer.ingress -}}
+      {{- $advertiseAddr = (index $lbSvc.status.loadBalancer.ingress 0).ip -}}
+      {{- if not $advertiseAddr -}}
+        {{- $advertiseAddr = (index $lbSvc.status.loadBalancer.ingress 0).hostname -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $advertiseAddr -}}
+  {{- fail "\n\nERROR: advertise.address is required for initial installation.\n\nPlease set either:\n1. A fixed LoadBalancer IP:\n   --set service.external.loadBalancerIP=YOUR_IP \\\n   --set advertise.address=YOUR_IP\n\n2. Or for dynamic IP (two-step process):\n   - First: helm install (will fail but create LoadBalancer)\n   - Wait for MetalLB to assign IP\n   - Then: helm upgrade with the assigned IP\n\nFor more details, see values.yaml\n" -}}
+{{- end -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nomad.fullname" . }}-config
+  namespace: {{ include "nomad.namespace" . }}
+  annotations:
+  labels:
+    {{- include "nomad.labels" . | nindent 4 }}
+data:
+  server.hcl: |
+    # Nomad Server Configuration
+    # Data directory
+    data_dir = "/nomad/data"
+
+    # Bind address
+    bind_addr = "0.0.0.0"
+
+    # Advertise addresses
+    advertise {
+      http = "{{ $advertiseAddr }}:4646"
+      rpc  = "{{ $advertiseAddr }}:4647"
+      serf = "{{ "{{ GetPrivateIP }}" }}:4648"
+    }
+
+    # Ports
+    ports {
+      http = 4646
+      rpc  = 4647
+      serf = 4648
+    }
+
+    # Server configuration
+    server {
+      enabled = true
+      bootstrap_expect = {{ .Values.replicaCount }}
+
+      # Server join configuration
+      server_join {
+        retry_join = [
+          {{- $fullname := include "nomad.fullname" . -}}
+          {{- $namespace := include "nomad.namespace" . -}}
+          {{- $serviceName := .Values.service.headless.name -}}
+          {{- range $i := until (int .Values.replicaCount) }}
+          "{{ $fullname }}-{{ $i }}.{{ $serviceName }}.{{ $namespace }}.svc.cluster.local",
+          {{- end }}
+        ]
+        retry_interval = "15s"
+        retry_max = 0
+      }
+
+      # Gossip encryption
+      encrypt = "{{ include "nomad.gossipKey" . }}"
+    }
+
+    {{- if .Values.server.acl.enabled }}
+    # ACL configuration
+    acl {
+      enabled = true
+    }
+    {{- end }}
+
+    {{- if .Values.server.autopilot }}
+    # Autopilot configuration
+    autopilot {
+      cleanup_dead_servers      = {{ .Values.server.autopilot.cleanupDeadServers }}
+      last_contact_threshold    = "{{ .Values.server.autopilot.lastContactThreshold }}"
+      max_trailing_logs         = {{ .Values.server.autopilot.maxTrailingLogs }}
+      server_stabilization_time = "{{ .Values.server.autopilot.serverStabilizationTime }}"
+      enable_redundancy_zones   = {{ .Values.server.autopilot.enableRedundancyZones }}
+      disable_upgrade_migration = {{ .Values.server.autopilot.disableUpgradeMigration }}
+      enable_custom_upgrades    = {{ .Values.server.autopilot.enableCustomUpgrades }}
+    }
+    {{- end }}
+
+    {{- if .Values.server.tls.enabled }}
+    # TLS configuration
+    tls {
+      http = true
+      rpc  = true
+
+      ca_file   = "/nomad/tls/ca.crt"
+      cert_file = "/nomad/tls/server.crt"
+      key_file  = "/nomad/tls/server.key"
+
+      verify_server_hostname = true
+      verify_https_client    = true
+    }
+    {{- end }}
+
+    # Telemetry
+    telemetry {
+      publish_allocation_metrics = true
+      publish_node_metrics       = true
+      prometheus_metrics         = true
+    }
+
+    # Leave on interrupt/term
+    leave_on_interrupt = true
+    leave_on_terminate = true
+
+    # Disable update check
+    disable_update_check = true
+
+    # Log level
+    log_level = "INFO"

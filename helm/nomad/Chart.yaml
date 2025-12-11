@@ -1,0 +1,18 @@
+apiVersion: v2
+name: nomad
+description: Nomad Enterprise Server StatefulSet for OpenShift with LoadBalancer support
+type: application
+version: 1.0.0
+appVersion: "1.9.3"
+keywords:
+  - nomad
+  - nomad-enterprise
+  - hashicorp
+  - orchestration
+  - statefulset
+  - openshift
+home: https://www.nomadproject.io
+sources:
+  - https://github.com/hashicorp/nomad
+maintainers:
+  - name: Platform Team
