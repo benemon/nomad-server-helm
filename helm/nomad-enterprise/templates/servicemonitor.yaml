@@ -1,0 +1,32 @@
+{{- if and .Values.openshift.enabled .Values.openshift.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "nomad.fullname" . }}
+  namespace: {{ include "nomad.namespace" . }}
+  labels:
+    {{- include "nomad.labels" . | nindent 4 }}
+    {{- with .Values.openshift.monitoring.serviceMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  endpoints:
+    - port: http
+      path: /v1/metrics
+      interval: {{ .Values.openshift.monitoring.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.openshift.monitoring.serviceMonitor.scrapeTimeout }}
+      params:
+        format:
+          - prometheus
+      {{- if .Values.server.tls.enabled }}
+      scheme: https
+      tlsConfig:
+        insecureSkipVerify: true
+      {{- end }}
+  namespaceSelector:
+    matchNames:
+      - {{ include "nomad.namespace" . }}
+  selector:
+    matchLabels:
+      {{- include "nomad.selectorLabels" . | nindent 6 }}
+{{- end }}

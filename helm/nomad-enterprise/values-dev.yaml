@@ -1,0 +1,61 @@
+# Development/PoC Values
+# Single replica, minimal resources, audit disabled
+# Usage: helm install nomad-enterprise . -f values-dev.yaml
+
+replicaCount: 1
+
+image:
+  repository: hashicorp/nomad-enterprise
+  tag: "1.9.3-ent"
+  pullPolicy: IfNotPresent
+
+# Required: Set your LoadBalancer IP
+advertise:
+  address: ""  # Must be set: e.g., "172.16.101.10"
+
+service:
+  external:
+    loadBalancerIP: ""  # Must match advertise.address
+
+# Minimal resources for development
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# Disable audit logging in dev
+server:
+  acl:
+    enabled: false
+  tls:
+    enabled: false
+  audit:
+    enabled: false
+  snapshot:
+    enabled: false
+
+# Use emptyDir for faster iteration (data lost on pod restart)
+persistence:
+  enabled: false
+  audit:
+    enabled: false
+
+# Disable anti-affinity for single-node clusters
+affinity:
+  podAntiAffinity:
+    enabled: false
+
+# Disable topology spread for single replica
+topologySpreadConstraints:
+  enabled: false
+
+# Disable monitoring for dev (reduces resource overhead)
+openshift:
+  enabled: true
+  route:
+    enabled: true
+  monitoring:
+    enabled: false

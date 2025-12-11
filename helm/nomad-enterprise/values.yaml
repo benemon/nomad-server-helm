@@ -32,7 +32,7 @@ gossip:
 service:
   # Headless service for StatefulSet (always created)
   headless:
-    name: nomad
+    name: nomad-enterprise
 
   # Internal ClusterIP service for API/UI (backend for Route)
   internal:
@@ -56,6 +56,18 @@ openshift:
     tls:
       termination: edge  # edge, passthrough, or reencrypt
       insecureEdgeTerminationPolicy: Redirect
+  # Monitoring integration (ServiceMonitor and PrometheusRule)
+  monitoring:
+    enabled: true
+    serviceMonitor:
+      interval: 30s
+      scrapeTimeout: 10s
+      # Additional labels to match your Prometheus selector
+      additionalLabels: {}
+    prometheusRule:
+      enabled: false  # Opt-in alerting rules
+      # Custom rules can be added here
+      rules: []
 
 # Advertise configuration
 # REQUIRED: Set this to the same IP/hostname as service.external.loadBalancerIP
@@ -74,6 +86,12 @@ persistence:
   storageClass: ""  # Empty means use cluster default
   size: 10Gi
   accessMode: ReadWriteOnce
+  # Separate PVC for audit logs (HVD requirement)
+  audit:
+    enabled: true
+    storageClass: ""  # Empty means use cluster default
+    size: 5Gi
+    accessMode: ReadWriteOnce
 
 # Resource limits and requests
 resources:
@@ -114,6 +132,33 @@ server:
     disableUpgradeMigration: false
     enableCustomUpgrades: false
 
+  # Audit logging configuration (HVD requirement)
+  audit:
+    enabled: true
+    sink:
+      type: file
+      format: json
+      path: /nomad/audit/audit.log
+      deliveryGuarantee: enforced
+      rotateDuration: "24h"
+      rotateMaxFiles: 15
+
+  # Snapshot agent configuration (HVD requirement)
+  # Requires Nomad Enterprise and S3-compatible storage
+  snapshot:
+    enabled: false
+    interval: "1h"
+    retain: 24
+    staleReads: true
+    # S3-compatible storage (e.g., ODF RGW, MinIO)
+    s3:
+      endpoint: ""  # e.g., https://s3.openshift-storage.svc:443
+      bucket: "nomad-snapshots"
+      region: "us-east-1"
+      forcePathStyle: true  # Required for most S3-compatible storage
+      # Reference to existing secret with access-key-id and secret-access-key keys
+      existingSecret: ""
+
 # Pod anti-affinity for high availability
 # Ensures Nomad server pods are spread across different nodes
 affinity:
@@ -127,6 +172,24 @@ affinity:
     weight: 100
     # Topology key for spreading pods
     topologyKey: kubernetes.io/hostname
+
+# Topology spread constraints for distributing pods across failure domains
+# More flexible than pod anti-affinity for multi-zone clusters
+topologySpreadConstraints:
+  enabled: true
+  constraints:
+    # Spread across nodes
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels: {}  # Will be populated with nomad.selectorLabels
+    # Uncomment for zone spreading (requires nodes with zone labels)
+    # - maxSkew: 1
+    #   topologyKey: topology.kubernetes.io/zone
+    #   whenUnsatisfiable: ScheduleAnyway
+    #   labelSelector:
+    #     matchLabels: {}
 
 # Node selector for scheduling
 nodeSelector: {}

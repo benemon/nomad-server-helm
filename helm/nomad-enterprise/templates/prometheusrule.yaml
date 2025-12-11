@@ -1,0 +1,32 @@
+{{- if and .Values.openshift.enabled .Values.openshift.monitoring.enabled .Values.openshift.monitoring.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "nomad.fullname" . }}
+  namespace: {{ include "nomad.namespace" . }}
+  labels:
+    {{- include "nomad.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: nomad.rules
+      rules:
+        - alert: NomadServerLeaderLost
+          expr: nomad_raft_leader == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Nomad cluster has no leader"
+            description: "The Nomad cluster has been without a leader for more than 1 minute."
+        - alert: NomadServerTooFewPeers
+          expr: nomad_raft_peers < {{ .Values.replicaCount }}
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Nomad cluster has fewer peers than expected"
+            description: "Expected {{ .Values.replicaCount }} peers but only {{ "{{ $value }}" }} are present."
+        {{- with .Values.openshift.monitoring.prometheusRule.rules }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+{{- end }}

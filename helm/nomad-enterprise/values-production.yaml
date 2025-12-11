@@ -1,0 +1,112 @@
+# Production Values
+# 3 replicas, audit enabled, topology spread, resource limits
+# Usage: helm install nomad-enterprise . -f values-production.yaml
+
+replicaCount: 3
+
+image:
+  repository: hashicorp/nomad-enterprise
+  tag: "1.9.3-ent"
+  pullPolicy: IfNotPresent
+
+# Required: Set your LoadBalancer IP
+advertise:
+  address: ""  # Must be set: e.g., "172.16.101.10"
+
+service:
+  external:
+    loadBalancerIP: ""  # Must match advertise.address
+
+# Production resource allocation
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+server:
+  # Enable ACLs in production
+  acl:
+    enabled: true
+
+  # Enable TLS in production (requires certificate setup)
+  tls:
+    enabled: false  # Set to true after configuring certificates
+
+  # Audit logging enabled (HVD requirement)
+  audit:
+    enabled: true
+    sink:
+      type: file
+      format: json
+      path: /nomad/audit/audit.log
+      deliveryGuarantee: enforced
+      rotateDuration: "24h"
+      rotateMaxFiles: 15
+
+  # Autopilot for automated cluster management
+  autopilot:
+    cleanupDeadServers: true
+    lastContactThreshold: "200ms"
+    maxTrailingLogs: 250
+    serverStabilizationTime: "10s"
+    enableRedundancyZones: false
+    disableUpgradeMigration: false
+    enableCustomUpgrades: false
+
+  # Snapshots (enable and configure for disaster recovery)
+  snapshot:
+    enabled: false  # Enable after configuring S3/MinIO
+    interval: "1h"
+    retain: 24
+    staleReads: true
+    s3:
+      endpoint: ""
+      bucket: "nomad-snapshots"
+      region: "us-east-1"
+      forcePathStyle: true
+      existingSecret: ""  # Required when enabled
+
+# Persistent storage
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 10Gi
+  audit:
+    enabled: true
+    storageClass: ""
+    size: 10Gi
+    accessMode: ReadWriteOnce
+
+# Pod anti-affinity to spread across nodes
+affinity:
+  podAntiAffinity:
+    enabled: true
+    type: preferred  # Use "required" for strict separation
+    weight: 100
+    topologyKey: kubernetes.io/hostname
+
+# Topology spread constraints for zone distribution
+topologySpreadConstraints:
+  enabled: true
+  constraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+    # Uncomment for multi-zone clusters:
+    # - maxSkew: 1
+    #   topologyKey: topology.kubernetes.io/zone
+    #   whenUnsatisfiable: DoNotSchedule
+
+# OpenShift monitoring with alerting for production
+openshift:
+  enabled: true
+  route:
+    enabled: true
+  monitoring:
+    enabled: true
+    prometheusRule:
+      enabled: true

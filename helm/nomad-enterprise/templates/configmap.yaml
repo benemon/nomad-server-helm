@@ -102,6 +102,42 @@ data:
     }
     {{- end }}
 
+    {{- if .Values.server.audit.enabled }}
+    # Audit logging configuration (HVD requirement)
+    audit {
+      enabled = true
+      sink "file" {
+        type               = "{{ .Values.server.audit.sink.type }}"
+        format             = "{{ .Values.server.audit.sink.format }}"
+        path               = "{{ .Values.server.audit.sink.path }}"
+        delivery_guarantee = "{{ .Values.server.audit.sink.deliveryGuarantee }}"
+        rotate_duration    = "{{ .Values.server.audit.sink.rotateDuration }}"
+        rotate_max_files   = {{ .Values.server.audit.sink.rotateMaxFiles }}
+      }
+    }
+    {{- end }}
+
+    {{- if .Values.server.snapshot.enabled }}
+    # Snapshot agent configuration (HVD requirement)
+    snapshot_agent {
+      snapshot {
+        interval         = "{{ .Values.server.snapshot.interval }}"
+        retain           = {{ .Values.server.snapshot.retain }}
+        stale_reads      = {{ .Values.server.snapshot.staleReads }}
+        deregister_after = "8h"
+      }
+
+      aws_s3 {
+        endpoint                       = "{{ .Values.server.snapshot.s3.endpoint }}"
+        bucket                         = "{{ .Values.server.snapshot.s3.bucket }}"
+        region                         = "{{ .Values.server.snapshot.s3.region }}"
+        s3_force_path_style            = {{ .Values.server.snapshot.s3.forcePathStyle }}
+        disable_ssl                    = false
+        skip_head_object_before_upload = true
+      }
+    }
+    {{- end }}
+
     # Telemetry
     telemetry {
       publish_allocation_metrics = true
