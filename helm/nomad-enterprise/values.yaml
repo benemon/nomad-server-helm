@@ -13,10 +13,6 @@ image:
 
 imagePullSecrets: []
 
-# Namespace creation
-namespaceCreate: true
-namespace: nomad
-
 # Nomad Enterprise license
 # Provide via: --set license=<your-license-string>
 # Or: --set-file license=/path/to/license.hclic

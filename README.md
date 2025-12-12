@@ -28,6 +28,8 @@ helm install nomad-enterprise ./helm/nomad-enterprise \
 ```bash
 # Development (single replica, minimal resources)
 helm install nomad-enterprise ./helm/nomad-enterprise \
+  --namespace nomad \
+  --create-namespace \
   -f values-dev.yaml \
   --set license="<your-license>" \
   --set advertise.address="172.16.101.10" \
@@ -35,6 +37,8 @@ helm install nomad-enterprise ./helm/nomad-enterprise \
 
 # Production (3 replicas, audit enabled)
 helm install nomad-enterprise ./helm/nomad-enterprise \
+  --namespace nomad \
+  --create-namespace \
   -f values-production.yaml \
   --set license="<your-license>" \
   --set advertise.address="172.16.101.10" \

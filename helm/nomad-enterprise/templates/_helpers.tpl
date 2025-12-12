@@ -65,10 +65,10 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Namespace
+Namespace - uses standard Helm release namespace
 */}}
 {{- define "nomad.namespace" -}}
-{{- default .Release.Namespace .Values.namespace }}
+{{- .Release.Namespace }}
 {{- end }}
 
 {{/*

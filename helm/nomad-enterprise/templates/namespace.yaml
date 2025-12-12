@@ -1,8 +1,0 @@
-{{- if .Values.namespaceCreate }}
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ include "nomad.namespace" . }}
-  labels:
-    {{- include "nomad.labels" . | nindent 4 }}
-{{- end }}
