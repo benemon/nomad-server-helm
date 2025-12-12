@@ -2,7 +2,7 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: {{ include "nomad.fullname" . }}
+  name: console
   namespace: {{ include "nomad.namespace" . }}
   annotations:
   labels:

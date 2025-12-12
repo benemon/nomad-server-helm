@@ -22,6 +22,15 @@ namespace: nomad
 # Or: --set-file license=/path/to/license.hclic
 license: ""
 
+# Nomad topology configuration
+topology:
+  # Region name for this Nomad cluster
+  # Typically represents a geographic region or logical grouping of datacenters
+  region: "global"
+  # Datacenter name - defaults to the release namespace if empty
+  # Represents a logical grouping of nodes (maps well to K8s namespace)
+  datacenter: ""  # Empty = use namespace
+
 # Gossip encryption configuration
 gossip:
   # Leave empty to auto-generate

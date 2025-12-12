@@ -75,6 +75,15 @@ This chart includes two example values files for common deployment scenarios:
 | `advertise.address` | External IP for client connections (required) | `""` |
 | `gossip.key` | Gossip encryption key (auto-generated if empty) | `""` |
 
+### Topology
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `topology.region` | Nomad region name | `"global"` |
+| `topology.datacenter` | Nomad datacenter name (defaults to namespace if empty) | `""` |
+
+The `datacenter` defaults to the Kubernetes namespace, providing a natural mapping between Nomad's topology and Kubernetes organization.
+
 ### Services
 
 | Parameter | Description | Default |
@@ -295,7 +304,7 @@ The gossip encryption key will be preserved across upgrades.
 Get the API Route URL:
 
 ```bash
-oc get route nomad-enterprise -n nomad -o jsonpath='{.spec.host}'
+oc get route console -n nomad -o jsonpath='{.spec.host}'
 ```
 
 ## ACL Bootstrap

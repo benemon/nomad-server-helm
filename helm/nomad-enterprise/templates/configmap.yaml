@@ -27,6 +27,10 @@ data:
     # Data directory
     data_dir = "/nomad/data"
 
+    # Topology
+    region     = "{{ .Values.topology.region }}"
+    datacenter = "{{ .Values.topology.datacenter | default .Release.Namespace }}"
+
     # Bind address
     bind_addr = "0.0.0.0"
 
