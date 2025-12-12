@@ -3,7 +3,7 @@ name: nomad-enterprise
 description: Nomad Enterprise Server StatefulSet for OpenShift with LoadBalancer support
 type: application
 version: 1.0.0
-appVersion: "1.9.3"
+appVersion: "1.11"
 keywords:
   - nomad
   - nomad-enterprise
