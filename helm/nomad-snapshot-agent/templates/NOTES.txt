@@ -1,0 +1,44 @@
+Nomad Snapshot Agent deployed successfully!
+
+Configuration:
+  Nomad Address: {{ .Values.nomad.address }}
+  Interval:      {{ .Values.schedule.interval }}
+  Retain:        {{ .Values.schedule.retain }} snapshots
+
+Storage Backend:
+{{- if .Values.storage.s3.enabled }}
+  Type:   S3
+  Bucket: {{ .Values.storage.s3.bucket }}
+  Region: {{ .Values.storage.s3.region }}
+  {{- if .Values.storage.s3.endpoint }}
+  Endpoint: {{ .Values.storage.s3.endpoint }}
+  {{- end }}
+{{- else if .Values.storage.gcs.enabled }}
+  Type:   Google Cloud Storage
+  Bucket: {{ .Values.storage.gcs.bucket }}
+{{- else if .Values.storage.azure.enabled }}
+  Type:      Azure Blob Storage
+  Container: {{ .Values.storage.azure.container }}
+  Account:   {{ .Values.storage.azure.accountName }}
+{{- else if .Values.storage.local.enabled }}
+  Type: Local PVC
+  Path: {{ .Values.storage.local.path }}
+  PVC:  {{ include "snapshot-agent.pvcName" . }}
+{{- end }}
+
+To check the snapshot agent logs:
+  kubectl logs -f deployment/{{ include "snapshot-agent.fullname" . }} -n {{ .Release.Namespace }}
+
+{{- if not .Values.token.secretName }}
+{{- if not .Values.token.value }}
+
+WARNING: No ACL token configured. If your Nomad cluster has ACLs enabled,
+the snapshot agent will fail to authenticate. Configure either:
+  --set token.secretName=<secret-name>  (recommended)
+  --set token.value=<token>             (for dev/testing only)
+{{- end }}
+{{- end }}
+
+To deploy multiple snapshot policies, install this chart multiple times:
+  helm install hourly ./nomad-snapshot-agent --set schedule.interval="1h" ...
+  helm install daily ./nomad-snapshot-agent --set schedule.interval="24h" ...

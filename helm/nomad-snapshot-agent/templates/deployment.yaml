@@ -1,0 +1,139 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "snapshot-agent.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "snapshot-agent.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "snapshot-agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "snapshot-agent.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "snapshot-agent.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: snapshot-agent
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - nomad
+            - operator
+            - snapshot
+            - agent
+            - /config/snapshot.hcl
+          env:
+            - name: NOMAD_ADDR
+              value: "{{ .Values.nomad.address }}"
+            {{- if .Values.nomad.tls.enabled }}
+            - name: NOMAD_CACERT
+              value: "/nomad/tls/{{ .Values.nomad.tls.caSecretKey }}"
+            {{- end }}
+            {{- /* ACL Token */ -}}
+            {{- if .Values.token.secretName }}
+            - name: NOMAD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.token.secretName }}
+                  key: {{ .Values.token.secretKey }}
+            {{- else if .Values.token.value }}
+            - name: NOMAD_TOKEN
+              value: {{ .Values.token.value | quote }}
+            {{- end }}
+            {{- /* S3 credentials */ -}}
+            {{- if and .Values.storage.s3.enabled .Values.storage.s3.credentials.secretName }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.storage.s3.credentials.secretName }}
+                  key: {{ .Values.storage.s3.credentials.accessKeyIdKey }}
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.storage.s3.credentials.secretName }}
+                  key: {{ .Values.storage.s3.credentials.secretAccessKeyKey }}
+            {{- end }}
+            {{- /* Azure credentials */ -}}
+            {{- if and .Values.storage.azure.enabled .Values.storage.azure.credentials.secretName }}
+            - name: AZURE_BLOB_ACCOUNT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.storage.azure.credentials.secretName }}
+                  key: {{ .Values.storage.azure.credentials.accountKeyKey }}
+            {{- end }}
+            {{- /* GCS credentials path */ -}}
+            {{- if and .Values.storage.gcs.enabled .Values.storage.gcs.credentials.secretName }}
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: "/gcp/{{ .Values.storage.gcs.credentials.secretKey }}"
+            {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            {{- if .Values.storage.local.enabled }}
+            - name: snapshots
+              mountPath: {{ .Values.storage.local.path }}
+            {{- end }}
+            {{- if .Values.nomad.tls.enabled }}
+            - name: tls
+              mountPath: /nomad/tls
+              readOnly: true
+            {{- end }}
+            {{- if and .Values.storage.gcs.enabled .Values.storage.gcs.credentials.secretName }}
+            - name: gcp-credentials
+              mountPath: /gcp
+              readOnly: true
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "snapshot-agent.fullname" . }}-config
+        {{- if .Values.storage.local.enabled }}
+        - name: snapshots
+          persistentVolumeClaim:
+            claimName: {{ include "snapshot-agent.pvcName" . }}
+        {{- end }}
+        {{- if .Values.nomad.tls.enabled }}
+        - name: tls
+          secret:
+            secretName: {{ .Values.nomad.tls.caSecretName }}
+        {{- end }}
+        {{- if and .Values.storage.gcs.enabled .Values.storage.gcs.credentials.secretName }}
+        - name: gcp-credentials
+          secret:
+            secretName: {{ .Values.storage.gcs.credentials.secretName }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

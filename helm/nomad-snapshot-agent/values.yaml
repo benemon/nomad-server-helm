@@ -1,0 +1,137 @@
+# Default values for nomad-snapshot-agent
+
+# Nomad cluster connection
+nomad:
+  # Required: Address of the Nomad cluster
+  # Example: "http://nomad-internal.nomad.svc:4646"
+  address: ""
+
+  # TLS configuration for connecting to Nomad
+  tls:
+    enabled: false
+    # Secret containing CA certificate
+    caSecretName: ""
+    caSecretKey: "ca.crt"
+
+# ACL Token configuration
+# Required when Nomad ACLs are enabled
+token:
+  # Option 1: Reference an existing secret containing the token
+  # The secret should have a key containing the Nomad ACL token (secret-id)
+  secretName: ""
+  secretKey: "secret-id"
+
+  # Option 2: Inline token value (less secure, for dev/testing only)
+  # If both secretName and value are set, secretName takes precedence
+  value: ""
+
+# Snapshot schedule configuration
+schedule:
+  # How often to take snapshots
+  interval: "1h"
+  # Number of snapshots to retain
+  retain: 24
+  # Allow reading from non-leader (reduces load on leader)
+  stale: false
+
+# Storage backend configuration
+# Exactly ONE storage backend must be enabled
+storage:
+  # S3 or S3-compatible storage (AWS S3, MinIO, ODF RGW, etc.)
+  s3:
+    enabled: false
+    bucket: ""
+    region: "us-east-1"
+    # Custom endpoint for S3-compatible storage
+    # Example: "https://s3.openshift-storage.svc:443"
+    endpoint: ""
+    # Use path-style URLs (required for most S3-compatible storage)
+    forcePathStyle: false
+
+    credentials:
+      # Option 1: Reference existing secret with AWS credentials
+      secretName: ""
+      accessKeyIdKey: "access-key-id"
+      secretAccessKeyKey: "secret-access-key"
+      # Option 2: Use IRSA (IAM Roles for Service Accounts) - no credentials needed
+      useIRSA: false
+
+  # Google Cloud Storage
+  gcs:
+    enabled: false
+    bucket: ""
+
+    credentials:
+      # Option 1: Reference existing secret with service account JSON
+      secretName: ""
+      secretKey: "credentials.json"
+      # Option 2: Use Workload Identity - no credentials needed
+      useWorkloadIdentity: false
+
+  # Azure Blob Storage
+  azure:
+    enabled: false
+    container: ""
+    accountName: ""
+
+    credentials:
+      # Option 1: Reference existing secret with account key
+      secretName: ""
+      accountKeyKey: "account-key"
+      # Option 2: Use Managed Identity - no credentials needed
+      useManagedIdentity: false
+
+  # Local PVC storage (for dev/testing or on-cluster backups)
+  local:
+    enabled: false
+    path: "/snapshots"
+    size: "10Gi"
+    # Storage class - uses cluster default if empty
+    storageClassName: ""
+    # Use an existing PVC instead of creating one
+    existingClaim: ""
+
+# Container image configuration
+image:
+  repository: "hashicorp/nomad"
+  tag: "1.11-ent"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# Resource limits and requests
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "200m"
+    memory: "128Mi"
+
+# Pod scheduling
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# ServiceAccount configuration
+serviceAccount:
+  # Create a dedicated service account
+  create: false
+  # Name of the service account (auto-generated if empty)
+  name: ""
+  # Annotations for the service account (useful for IRSA/Workload Identity)
+  annotations: {}
+
+# Additional pod annotations
+podAnnotations: {}
+
+# Additional pod labels
+podLabels: {}
+
+# Security context for the pod
+podSecurityContext:
+  runAsNonRoot: true
+  # OpenShift assigns arbitrary UID
+
+# Security context for the container
+securityContext: {}

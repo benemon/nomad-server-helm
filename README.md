@@ -1,10 +1,17 @@
-# Nomad Enterprise Server Helm Chart
+# Nomad Enterprise Helm Charts
 
-A Helm chart for deploying HashiCorp Nomad Enterprise Server as a StatefulSet in OpenShift, aligned with HashiCorp Validated Design (HVD) recommendations.
+Helm charts for deploying HashiCorp Nomad Enterprise in OpenShift, aligned with HashiCorp Validated Design (HVD) recommendations.
+
+## Charts
+
+| Chart | Description |
+|-------|-------------|
+| [nomad-enterprise](helm/nomad-enterprise/) | Nomad Enterprise Server StatefulSet |
+| [nomad-snapshot-agent](helm/nomad-snapshot-agent/) | Standalone snapshot agent for automated backups |
 
 ## Prerequisites
 
-- OpenShift 4.x cluster
+- OpenShift 4.x cluster (Kubernetes 1.27+ for PVC retention policy)
 - Helm 3.x
 - Nomad Enterprise license
 - MetalLB or equivalent LoadBalancer provider
@@ -103,8 +110,12 @@ The `datacenter` defaults to the Kubernetes namespace, providing a natural mappi
 |-----------|-------------|---------|
 | `persistence.enabled` | Enable persistent storage | `true` |
 | `persistence.size` | Data volume size | `10Gi` |
+| `persistence.retentionPolicy.whenDeleted` | PVC behavior on StatefulSet deletion | `Delete` |
+| `persistence.retentionPolicy.whenScaled` | PVC behavior on scale-down | `Retain` |
 | `persistence.audit.enabled` | Enable separate audit PVC | `true` |
 | `persistence.audit.size` | Audit volume size | `5Gi` |
+
+> **Note**: PVCs are automatically deleted when the StatefulSet is deleted (`whenDeleted: Delete`) to prevent Raft leader election issues on reinstall. Set `whenDeleted: Retain` if you need to preserve data across uninstall/reinstall cycles. Requires Kubernetes 1.27+.
 
 ### Audit Logging (HVD)
 
@@ -118,14 +129,7 @@ The `datacenter` defaults to the Kubernetes namespace, providing a natural mappi
 
 ### Snapshots (HVD)
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `server.snapshot.enabled` | Enable automated snapshots | `false` |
-| `server.snapshot.interval` | Snapshot interval | `1h` |
-| `server.snapshot.retain` | Number of snapshots to retain | `24` |
-| `server.snapshot.s3.endpoint` | S3/MinIO endpoint | `""` |
-| `server.snapshot.s3.bucket` | S3 bucket name | `nomad-snapshots` |
-| `server.snapshot.s3.existingSecret` | Secret with S3 credentials | `""` |
+Automated snapshots are provided by the separate `nomad-snapshot-agent` chart. See [Snapshot Configuration](#snapshot-configuration) below.
 
 ### Topology
 
@@ -150,7 +154,7 @@ Per HVD recommendations, audit logs are enabled by default and written to a sepa
 - Compliance with security requirements
 
 #### Automated Snapshots
-The chart supports Nomad's built-in snapshot agent for disaster recovery. When enabled, snapshots are automatically taken and uploaded to S3-compatible storage (including MinIO).
+The `nomad-snapshot-agent` chart deploys Nomad's snapshot agent as a standalone daemon for disaster recovery. Supports S3, GCS, Azure Blob, and local PVC storage backends. Multiple snapshot policies can run simultaneously by installing the chart multiple times.
 
 #### Gossip Encryption
 Gossip encryption is always enabled. A key is auto-generated if not provided.
@@ -189,41 +193,97 @@ topologySpreadConstraints:
 
 ## Snapshot Configuration
 
-To enable automated snapshots to S3-compatible storage:
+The Nomad snapshot agent runs as a standalone daemon, deployed separately from the Nomad servers. Use the `nomad-snapshot-agent` chart for automated backups.
 
-### 1. Create S3 Credentials Secret
+### Storage Backends
+
+The snapshot agent supports multiple storage backends:
+- **S3/S3-compatible** (AWS S3, MinIO, ODF RGW)
+- **Google Cloud Storage**
+- **Azure Blob Storage**
+- **Local PVC** (for dev/testing or on-cluster backups)
+
+### Quick Start - Local Storage
 
 ```bash
-oc create secret generic nomad-s3-credentials \
+helm install snapshot ./helm/nomad-snapshot-agent \
+  --namespace nomad \
+  --set nomad.address="http://nomad-internal:4646" \
+  --set storage.local.enabled=true
+```
+
+### Quick Start - S3 Storage
+
+```bash
+# Create credentials secret
+oc create secret generic s3-credentials \
   --namespace nomad \
   --from-literal=access-key-id="YOUR_ACCESS_KEY" \
   --from-literal=secret-access-key="YOUR_SECRET_KEY"
+
+# Install snapshot agent
+helm install snapshot ./helm/nomad-snapshot-agent \
+  --namespace nomad \
+  --set nomad.address="http://nomad-internal:4646" \
+  --set storage.s3.enabled=true \
+  --set storage.s3.bucket="nomad-snapshots" \
+  --set storage.s3.endpoint="https://minio.example.com" \
+  --set storage.s3.forcePathStyle=true \
+  --set storage.s3.credentials.secretName="s3-credentials"
 ```
 
-### 2. Enable Snapshots in Values
+### With ACLs Enabled
 
-```yaml
-server:
-  snapshot:
-    enabled: true
-    interval: "1h"
-    retain: 24
-    s3:
-      endpoint: "https://minio.example.com"
-      bucket: "nomad-snapshots"
-      region: "us-east-1"
-      forcePathStyle: true
-      existingSecret: "nomad-s3-credentials"
-```
-
-### 3. Install/Upgrade
+If your Nomad cluster has ACLs enabled, provide a token with snapshot permissions:
 
 ```bash
-helm upgrade nomad-enterprise ./helm/nomad-enterprise \
-  --set server.snapshot.enabled=true \
-  --set server.snapshot.s3.endpoint="https://minio.example.com" \
-  --set server.snapshot.s3.existingSecret="nomad-s3-credentials"
+helm install snapshot ./helm/nomad-snapshot-agent \
+  --namespace nomad \
+  --set nomad.address="http://nomad-internal:4646" \
+  --set token.secretName="nomad-acl-bootstrap" \
+  --set storage.local.enabled=true
 ```
+
+### Multiple Snapshot Policies
+
+Install the chart multiple times for different backup schedules:
+
+```bash
+# Hourly snapshots to local storage (quick recovery)
+helm install hourly-snapshot ./helm/nomad-snapshot-agent \
+  --namespace nomad \
+  --set nomad.address="http://nomad-internal:4646" \
+  --set schedule.interval="1h" \
+  --set schedule.retain=24 \
+  --set storage.local.enabled=true
+
+# Daily snapshots to S3 (disaster recovery)
+helm install daily-snapshot ./helm/nomad-snapshot-agent \
+  --namespace nomad \
+  --set nomad.address="http://nomad-internal:4646" \
+  --set schedule.interval="24h" \
+  --set schedule.retain=30 \
+  --set storage.s3.enabled=true \
+  --set storage.s3.bucket="nomad-dr-snapshots" \
+  --set storage.s3.credentials.secretName="s3-credentials"
+```
+
+### Snapshot Agent Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `nomad.address` | Nomad cluster address (required) | `""` |
+| `nomad.tls.enabled` | Enable TLS for Nomad connection | `false` |
+| `token.secretName` | Secret containing ACL token | `""` |
+| `token.secretKey` | Key within secret | `secret-id` |
+| `schedule.interval` | Snapshot interval | `1h` |
+| `schedule.retain` | Snapshots to retain | `24` |
+| `storage.s3.enabled` | Use S3 storage | `false` |
+| `storage.gcs.enabled` | Use Google Cloud Storage | `false` |
+| `storage.azure.enabled` | Use Azure Blob Storage | `false` |
+| `storage.local.enabled` | Use local PVC storage | `false` |
+
+See [helm/nomad-snapshot-agent/values.yaml](helm/nomad-snapshot-agent/values.yaml) for complete configuration options.
 
 ## Observability
 

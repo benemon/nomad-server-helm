@@ -15,6 +15,11 @@ spec:
   podManagementPolicy: Parallel
   updateStrategy:
     type: RollingUpdate
+  {{- if .Values.persistence.enabled }}
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: {{ .Values.persistence.retentionPolicy.whenDeleted }}
+    whenScaled: {{ .Values.persistence.retentionPolicy.whenScaled }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "nomad.selectorLabels" . | nindent 6 }}
@@ -94,21 +99,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
-        {{- if .Values.server.snapshot.enabled }}
-        {{- if not .Values.server.snapshot.s3.existingSecret }}
-        {{- fail "server.snapshot.s3.existingSecret is required when snapshots are enabled" }}
-        {{- end }}
-        - name: AWS_ACCESS_KEY_ID
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.server.snapshot.s3.existingSecret }}
-              key: access-key-id
-        - name: AWS_SECRET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.server.snapshot.s3.existingSecret }}
-              key: secret-access-key
-        {{- end }}
         ports:
         - name: http
           containerPort: 4646

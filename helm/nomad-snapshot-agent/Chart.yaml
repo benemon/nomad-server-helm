@@ -1,0 +1,17 @@
+apiVersion: v2
+name: nomad-snapshot-agent
+description: Nomad Enterprise Snapshot Agent for automated Raft snapshots
+type: application
+version: 1.0.0
+appVersion: "1.11"
+maintainers:
+  - name: Platform Team
+keywords:
+  - nomad
+  - hashicorp
+  - snapshot
+  - backup
+  - disaster-recovery
+home: https://developer.hashicorp.com/nomad/docs/commands/operator/snapshot/agent
+sources:
+  - https://github.com/hashicorp/nomad

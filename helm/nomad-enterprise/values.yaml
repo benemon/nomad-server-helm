@@ -91,6 +91,17 @@ persistence:
   storageClass: ""  # Empty means use cluster default
   size: 10Gi
   accessMode: ReadWriteOnce
+  # PVC retention policy (Kubernetes 1.27+)
+  # Controls whether PVCs are deleted when StatefulSet is deleted or scaled down
+  retentionPolicy:
+    # What happens to PVCs when the StatefulSet is deleted
+    # "Delete": PVCs are automatically deleted with the StatefulSet
+    # "Retain": PVCs are kept - requires manual cleanup before reinstall
+    whenDeleted: Delete
+    # What happens to PVCs when scaling down replicas
+    # "Retain": PVCs are kept for potential scale-up
+    # "Delete": PVCs are deleted when pods are removed
+    whenScaled: Retain
   # Separate PVC for audit logs (HVD requirement)
   audit:
     enabled: true
@@ -148,21 +159,15 @@ server:
       rotateDuration: "24h"
       rotateMaxFiles: 15
 
-  # Snapshot agent configuration (HVD requirement)
-  # Requires Nomad Enterprise and S3-compatible storage
-  snapshot:
-    enabled: false
-    interval: "1h"
-    retain: 24
-    staleReads: true
-    # S3-compatible storage (e.g., ODF RGW, MinIO)
-    s3:
-      endpoint: ""  # e.g., https://s3.openshift-storage.svc:443
-      bucket: "nomad-snapshots"
-      region: "us-east-1"
-      forcePathStyle: true  # Required for most S3-compatible storage
-      # Reference to existing secret with access-key-id and secret-access-key keys
-      existingSecret: ""
+  # DEPRECATED: Snapshot agent configuration has moved to a separate chart.
+  # The snapshot agent runs as a standalone daemon, not as part of the Nomad server.
+  # Use the nomad-snapshot-agent chart instead:
+  #   helm install snapshot ./nomad-snapshot-agent \
+  #     --set nomad.address="http://nomad-internal.NAMESPACE.svc:4646" \
+  #     --set token.secretName="nomad-acl-bootstrap" \
+  #     --set storage.s3.enabled=true \
+  #     --set storage.s3.bucket="nomad-snapshots"
+  # See: helm/nomad-snapshot-agent/README.md
 
   # Additional Nomad configuration (raw HCL)
   # Merged with server.hcl as /nomad/config/90-custom.hcl

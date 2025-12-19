@@ -1,0 +1,18 @@
+{{- if and .Values.storage.local.enabled (not .Values.storage.local.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "snapshot-agent.pvcName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "snapshot-agent.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.storage.local.storageClassName }}
+  storageClassName: {{ .Values.storage.local.storageClassName | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.local.size }}
+{{- end }}
